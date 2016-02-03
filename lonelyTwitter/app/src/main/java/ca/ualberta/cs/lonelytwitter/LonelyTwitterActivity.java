@@ -11,6 +11,7 @@ import java.util.Date;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -18,8 +19,16 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 
-public class LonelyTwitterActivity extends Activity {
+/**
+ *This is the main funtion of this whole program
+ *it can let you type in some records. Then it can save all words.
+ *
+ *@author Runqi Wang
+ *@version 1.00, 02/02/2016
+ *
+ */
 
+public class LonelyTwitterActivity extends Activity {
 	private static final String FILENAME = "file.sav";
 	private EditText bodyText;
 	private ListView oldTweetsList;
@@ -46,6 +55,10 @@ public class LonelyTwitterActivity extends Activity {
 		});
 	}
 
+	/**
+	 * when the main function is called this onStart() will work
+	 */
+
 	@Override
 	protected void onStart() {
 		// TODO Auto-generated method stub
@@ -56,6 +69,10 @@ public class LonelyTwitterActivity extends Activity {
 		oldTweetsList.setAdapter(adapter);
 	}
 
+	/**
+	 * this function can load the file. Then we can read what we restore in it.
+	 * @return the data in file
+	 */
 	private String[] loadFromFile() {
 		ArrayList<String> tweets = new ArrayList<String>();
 		try {
@@ -76,7 +93,12 @@ public class LonelyTwitterActivity extends Activity {
 		}
 		return tweets.toArray(new String[tweets.size()]);
 	}
-	
+
+	/**
+	 * this function make saving possible.
+	 * @param text the text that we type
+	 * @param date the date we use it to record
+	 */
 	private void saveInFile(String text, Date date) {
 		try {
 			FileOutputStream fos = openFileOutput(FILENAME,
