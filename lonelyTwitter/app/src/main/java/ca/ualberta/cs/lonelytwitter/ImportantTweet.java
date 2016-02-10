@@ -4,8 +4,6 @@ import java.util.Date;
 
 /**
  * Created by romansky on 1/12/16.
- * make important Tweet as special
- *
  */
 public class ImportantTweet extends Tweet implements Tweetable {
     @Override
@@ -21,18 +19,10 @@ public class ImportantTweet extends Tweet implements Tweetable {
         super(message);
     }
 
-    /**
-     * get the current time
-     * @return the current time
-     */
     public Date getDate() {
         return this.date;
     }
 
-    /**
-     * get message
-     * @return the message
-     */
     public String getMessage() {
         return "!IMPORTANT! " + this.message;
     }

@@ -1,11 +1,14 @@
 package ca.ualberta.cs.lonelytwitter;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Date;
 
@@ -19,19 +22,26 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 
-/**
- *This is the main funtion of this whole program
- *it can let you type in some records. Then it can save all words.
- *
- *@author Runqi Wang
- *@version 1.00, 02/02/2016
- *
- */
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 public class LonelyTwitterActivity extends Activity {
+
 	private static final String FILENAME = "file.sav";
 	private EditText bodyText;
 	private ListView oldTweetsList;
+
+	private ArrayList<Tweet> tweets = new ArrayList<Tweet>();
+
+	public ArrayAdapter<Tweet> getAdapter() {
+		return adapter;
+	}
+
+	public void setAdapter(ArrayAdapter<Tweet> adapter) {
+		this.adapter = adapter;
+	}
+
+	private ArrayAdapter<Tweet> adapter;
 	
 	/** Called when the activity is first created. */
 	@Override
@@ -48,70 +58,72 @@ public class LonelyTwitterActivity extends Activity {
 			public void onClick(View v) {
 				setResult(RESULT_OK);
 				String text = bodyText.getText().toString();
-				saveInFile(text, new Date(System.currentTimeMillis()));
-				finish();
+				Tweet latestTweet = new NormalTweet(text);
+				ImportantTweet latestImportantTweet = new ImportantTweet(text);
+				// latestTweet.setMessage(latestTweet.getMessage() + "!");
+				tweets.add(latestTweet);
+				adapter.notifyDataSetChanged();
+				saveInFile();
+				//saveInFile(text, new Date(System.currentTimeMillis()));
+				//finish();
 
+				//
+				//
+				Intent intent = new Intent(LonelyTwitterActivity.this, IntentReaderActivity.class);
+				intent.putExtra(IntentReaderActivity.TEXT_TO_TRANSFORM_KEY,"test message 1");
+				intent.putExtra(IntentReaderActivity.MODE_OF_TRANSFORM_KEY,IntentReaderActivity.NORMAL);
+				startActivity(intent);
+				//
+				//
 			}
 		});
 	}
-
-	/**
-	 * when the main function is called this onStart() will work
-	 */
 
 	@Override
 	protected void onStart() {
 		// TODO Auto-generated method stub
 		super.onStart();
-		String[] tweets = loadFromFile();
-		ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+		//String[] tweets = loadFromFile();
+		loadFromFile();
+		adapter = new ArrayAdapter<Tweet>(this,
 				R.layout.list_item, tweets);
 		oldTweetsList.setAdapter(adapter);
 	}
 
-	/**
-	 * this function can load the file. Then we can read what we restore in it.
-	 * @return the data in file
-	 */
-	private String[] loadFromFile() {
-		ArrayList<String> tweets = new ArrayList<String>();
+	private void loadFromFile() {
 		try {
 			FileInputStream fis = openFileInput(FILENAME);
 			BufferedReader in = new BufferedReader(new InputStreamReader(fis));
-			String line = in.readLine();
-			while (line != null) {
-				tweets.add(line);
-				line = in.readLine();
-			}
+			Gson gson = new Gson();
+
+			// Took from https://google-gson.googlecode.com/svn/trunk/gson/docs/javadocs/com/google/gson/Gson.html 01-19 2016
+			Type listType = new TypeToken<ArrayList<NormalTweet>>() {}.getType();
+			tweets = gson.fromJson(in, listType);
 
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			tweets = new ArrayList<Tweet>();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			throw new RuntimeException();
 		}
-		return tweets.toArray(new String[tweets.size()]);
 	}
-
-	/**
-	 * this function make saving possible.
-	 * @param text the text that we type
-	 * @param date the date we use it to record
-	 */
-	private void saveInFile(String text, Date date) {
+	
+	private void saveInFile() {
 		try {
 			FileOutputStream fos = openFileOutput(FILENAME,
-					Context.MODE_APPEND);
-			fos.write(new String(date.toString() + " | " + text)
-					.getBytes());
+					0);
+			BufferedWriter out = new BufferedWriter(new OutputStreamWriter(fos));
+			Gson gson = new Gson();
+			gson.toJson(tweets, out);
+			out.flush();
 			fos.close();
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			throw new RuntimeException();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			throw new RuntimeException();
 		}
 	}
 }
