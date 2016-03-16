@@ -1,35 +1,38 @@
+
 package ca.ualberta.cs.lonelytwitter;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ListView;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.concurrent.ExecutionException;
 
 public class LonelyTwitterActivity extends Activity {
 
-    private static final String FILENAME = "file.sav";
     private EditText bodyText;
     private ListView oldTweetsList;
 
     private ArrayList<Tweet> tweets = new ArrayList<Tweet>();
     private ArrayAdapter<Tweet> adapter;
+
+    private Button saveButton;
+
+    private ImageButton pictureButton;
+    private Bitmap thumbnail;
+
+    static final int REQUEST_IMAGE_CAPTURE = 1234;
 
     public ArrayAdapter<Tweet> getAdapter() {
         return adapter;
@@ -43,21 +46,46 @@ public class LonelyTwitterActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
-        bodyText = (EditText) findViewById(R.id.body);
-        Button saveButton = (Button) findViewById(R.id.save);
-        oldTweetsList = (ListView) findViewById(R.id.oldTweetsList);
+        bodyText = (EditText) findViewById(R.id.tweetMessage);
+        oldTweetsList = (ListView) findViewById(R.id.tweetsList);
 
+
+        pictureButton = (ImageButton) findViewById(R.id.pictureButton);
+        pictureButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View view) {
+                Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                if (intent.resolveActivity(getPackageManager()) != null) {
+                    startActivityForResult(intent, REQUEST_IMAGE_CAPTURE);
+                }
+            }
+        });
+
+        saveButton = (Button) findViewById(R.id.saveButton);
         saveButton.setOnClickListener(new View.OnClickListener() {
 
             public void onClick(View v) {
                 String text = bodyText.getText().toString();
-                Tweet latestTweet = new NormalTweet(text);
+                NormalTweet latestTweet = new NormalTweet(text);
 
                 tweets.add(latestTweet);
+
+                latestTweet.addThumbnail(thumbnail);
+
+                Collections.sort(tweets, new Comparator<Tweet>() {
+                    public int compare(Tweet lhs, Tweet rhs) {
+                        return rhs.getDate().compareTo(lhs.getDate());
+                    }
+                });
+
                 adapter.notifyDataSetChanged();
 
-                // TODO: Replace with Elasticsearch
-                saveInFile();
+                // Add the tweet to Elasticsearch
+                ElasticsearchTweetController.AddTweetTask addTweetTask = new ElasticsearchTweetController.AddTweetTask();
+                addTweetTask.execute(latestTweet);
+
+                bodyText.setText("");
+                pictureButton.setImageResource(android.R.color.transparent);
+                thumbnail = null;
 
                 setResult(RESULT_OK);
             }
@@ -68,49 +96,31 @@ public class LonelyTwitterActivity extends Activity {
     protected void onStart() {
         super.onStart();
 
-        // Get latest tweets
-        // TODO: Replace with Elasticsearch
-        loadFromFile();
+        // Get the latest tweets from Elasticsearch
+        ElasticsearchTweetController.GetTweetsTask getTweetsTask = new ElasticsearchTweetController.GetTweetsTask();
+//        getTweetsTask.execute("test");
+        getTweetsTask.execute("");
+        try {
+            tweets = new ArrayList<Tweet>();
+            tweets.addAll(getTweetsTask.get());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
 
         // Binds tweet list with view, so when our array updates, the view updates with it
-        adapter = new ArrayAdapter<Tweet>(this, R.layout.list_item, tweets);
+        adapter = new TweetAdapter(this, tweets); /* NEW! */
         oldTweetsList.setAdapter(adapter);
     }
 
-    private void loadFromFile() {
-        try {
-            FileInputStream fis = openFileInput(FILENAME);
-            BufferedReader in = new BufferedReader(new InputStreamReader(fis));
-            Gson gson = new Gson();
-
-            // Took from https://google-gson.googlecode.com/svn/trunk/gson/docs/javadocs/com/google/gson/Gson.html 01-19 2016
-            Type listType = new TypeToken<ArrayList<NormalTweet>>() {
-            }.getType();
-            tweets = gson.fromJson(in, listType);
-
-        } catch (FileNotFoundException e) {
-            // TODO Auto-generated catch block
-            tweets = new ArrayList<Tweet>();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            throw new RuntimeException();
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data){
+        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK){
+            Bundle extras = data .getExtras();
+            thumbnail = (Bitmap) extras.get("data");
+            pictureButton.setImageBitmap(thumbnail);
         }
     }
 
-    private void saveInFile() {
-        try {
-            FileOutputStream fos = openFileOutput(FILENAME, 0);
-            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(fos));
-            Gson gson = new Gson();
-            gson.toJson(tweets, out);
-            out.flush();
-            fos.close();
-        } catch (FileNotFoundException e) {
-            // TODO Auto-generated catch block
-            throw new RuntimeException();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            throw new RuntimeException();
-        }
-    }
 }
